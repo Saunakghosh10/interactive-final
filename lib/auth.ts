@@ -6,16 +6,21 @@ import CredentialsProvider from "next-auth/providers/credentials"
 import { prisma } from "./db"
 import bcrypt from "bcryptjs"
 
+if (!process.env.NEXTAUTH_SECRET) {
+  throw new Error("Please provide process.env.NEXTAUTH_SECRET")
+}
+
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
+  secret: process.env.NEXTAUTH_SECRET,
   providers: [
     GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      clientId: process.env.GOOGLE_CLIENT_ID || "",
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
     }),
     GitHubProvider({
-      clientId: process.env.GITHUB_ID!,
-      clientSecret: process.env.GITHUB_SECRET!,
+      clientId: process.env.GITHUB_ID || "",
+      clientSecret: process.env.GITHUB_SECRET || "",
     }),
     CredentialsProvider({
       name: "credentials",
@@ -25,33 +30,38 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
-          return null
+          throw new Error("Invalid credentials")
         }
 
-        const user = await prisma.user.findUnique({
-          where: { email: credentials.email },
-        })
+        try {
+          const user = await prisma.user.findUnique({
+            where: { email: credentials.email },
+          })
 
-        if (!user || !user.password) {
-          return null
-        }
+          if (!user || !user.password) {
+            throw new Error("User not found")
+          }
 
-        // Check if email is verified for manual registrations
-        if (!user.emailVerified && user.password) {
-          throw new Error("Please verify your email before signing in.")
-        }
+          // Check if email is verified for manual registrations
+          if (!user.emailVerified && user.password) {
+            throw new Error("Please verify your email before signing in.")
+          }
 
-        const isPasswordValid = await bcrypt.compare(credentials.password, user.password)
+          const isPasswordValid = await bcrypt.compare(credentials.password, user.password)
 
-        if (!isPasswordValid) {
-          return null
-        }
+          if (!isPasswordValid) {
+            throw new Error("Invalid password")
+          }
 
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          image: user.image,
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            image: user.image,
+          }
+        } catch (error) {
+          console.error("Auth error:", error)
+          throw error
         }
       },
     }),
@@ -79,17 +89,12 @@ export const authOptions: NextAuthOptions = {
   },
   session: {
     strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60, // 30 days for remember me functionality
+    maxAge: 30 * 24 * 60 * 60, // 30 days
   },
   pages: {
     signIn: "/auth/signin",
     signUp: "/auth/signup",
     error: "/auth/error",
   },
-  events: {
-    async signIn({ user, account, profile }) {
-      // Log successful sign-ins
-      console.log(`User ${user.email} signed in with ${account?.provider}`)
-    },
-  },
+  debug: process.env.NODE_ENV === "development",
 }

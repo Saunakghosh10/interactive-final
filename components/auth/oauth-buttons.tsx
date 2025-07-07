@@ -1,24 +1,27 @@
 "use client"
 
-import { useState } from "react"
+import { useState, Suspense } from "react"
 import { signIn } from "next-auth/react"
 import { Button } from "@/components/ui/button"
 import { AuthLoading } from "@/components/ui/auth-loading"
 import { Github } from "lucide-react"
+import { useSearchParams } from "next/navigation"
 
-interface OAuthButtonsProps {
-  callbackUrl?: string
-  disabled?: boolean
-}
-
-export function OAuthButtons({ callbackUrl = "/dashboard", disabled = false }: OAuthButtonsProps) {
+function OAuthButtonsContent({ callbackUrl, disabled = false }: OAuthButtonsProps) {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)
   const [isGitHubLoading, setIsGitHubLoading] = useState(false)
+  const searchParams = useSearchParams()
+  
+  // Get the callback URL from the URL params or use the provided one
+  const finalCallbackUrl = searchParams?.get("callbackUrl") || callbackUrl || "/dashboard"
 
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true)
     try {
-      await signIn("google", { callbackUrl })
+      await signIn("google", { 
+        callbackUrl: finalCallbackUrl,
+        redirect: true,
+      })
     } catch (error) {
       console.error("Google sign in error:", error)
     } finally {
@@ -29,7 +32,10 @@ export function OAuthButtons({ callbackUrl = "/dashboard", disabled = false }: O
   const handleGitHubSignIn = async () => {
     setIsGitHubLoading(true)
     try {
-      await signIn("github", { callbackUrl })
+      await signIn("github", { 
+        callbackUrl: finalCallbackUrl,
+        redirect: true,
+      })
     } catch (error) {
       console.error("GitHub sign in error:", error)
     } finally {
@@ -88,5 +94,18 @@ export function OAuthButtons({ callbackUrl = "/dashboard", disabled = false }: O
         )}
       </Button>
     </div>
+  )
+}
+
+interface OAuthButtonsProps {
+  callbackUrl?: string
+  disabled?: boolean
+}
+
+export function OAuthButtons(props: OAuthButtonsProps) {
+  return (
+    <Suspense fallback={<AuthLoading />}>
+      <OAuthButtonsContent {...props} />
+    </Suspense>
   )
 }

@@ -18,6 +18,19 @@ export async function POST(
 
     const ideaId = params.id
 
+    // Verify user exists
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { id: true }
+    })
+
+    if (!user) {
+      return NextResponse.json(
+        { message: "User not found" },
+        { status: 404 }
+      )
+    }
+
     // Check if idea exists
     const idea = await prisma.idea.findUnique({
       where: { id: ideaId },
@@ -49,10 +62,16 @@ export async function POST(
 
     // Create spark
     await prisma.spark.create({
-        data: {
-          userId: session.user.id,
-          ideaId,
-        },
+      data: {
+        userId: session.user.id,
+        ideaId,
+      },
+    })
+
+    // Update idea spark count
+    await prisma.idea.update({
+      where: { id: ideaId },
+      data: { sparkCount: { increment: 1 } },
     })
 
     return NextResponse.json({ message: "Sparked successfully" })

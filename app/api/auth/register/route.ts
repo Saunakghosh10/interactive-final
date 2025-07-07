@@ -13,14 +13,15 @@ export async function POST(request: NextRequest) {
       password: body.password ? "[REDACTED]" : undefined,
     })
 
-    const { name, email, password } = body
+    const { name, email, password, username } = body
 
     // Validation
-    if (!name || !email || !password) {
+    if (!name || !email || !password || !username) {
       console.log("Missing required fields:", {
         name: !name,
         email: !email,
         password: !password,
+        username: !username,
       })
       return NextResponse.json(
         {
@@ -29,10 +30,20 @@ export async function POST(request: NextRequest) {
             name: !name ? "Name is required" : null,
             email: !email ? "Email is required" : null,
             password: !password ? "Password is required" : null,
+            username: !username ? "Username is required" : null,
           },
         },
         { status: 400 },
       )
+    }
+
+    // Username validation
+    const usernameRegex = /^[a-zA-Z0-9_-]+$/
+    if (!usernameRegex.test(username)) {
+      console.log("Invalid username format:", username)
+      return NextResponse.json({ 
+        message: "Username can only contain letters, numbers, underscores, and hyphens" 
+      }, { status: 400 })
     }
 
     // Email format validation
@@ -62,13 +73,22 @@ export async function POST(request: NextRequest) {
 
     try {
       // Check if user already exists
-      const existingUser = await prisma.user.findUnique({
-        where: { email },
+      const existingUser = await prisma.user.findFirst({
+        where: {
+          OR: [
+            { email },
+            { username }
+          ]
+        }
       })
 
       if (existingUser) {
-        console.log("User already exists:", email)
-        return NextResponse.json({ message: "User with this email already exists" }, { status: 400 })
+        console.log("User already exists:", existingUser.email === email ? "email" : "username")
+        return NextResponse.json({ 
+          message: existingUser.email === email 
+            ? "User with this email already exists" 
+            : "Username is already taken"
+        }, { status: 400 })
       }
 
       // Hash password
@@ -83,6 +103,7 @@ export async function POST(request: NextRequest) {
         data: {
           name,
           email,
+          username,
           password: hashedPassword,
           emailVerified: null,
           verificationToken,
@@ -94,6 +115,7 @@ export async function POST(request: NextRequest) {
         id: user.id,
         email: user.email,
         name: user.name,
+        username: user.username,
       })
 
       // Send verification email

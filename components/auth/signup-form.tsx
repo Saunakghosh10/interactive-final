@@ -71,6 +71,7 @@ export function SignUpForm() {
         name: data.name,
         email: data.email,
         passwordLength: data.password?.length,
+        username: data.username,
       })
 
       const response = await fetch("/api/auth/register", {
@@ -82,6 +83,7 @@ export function SignUpForm() {
           name: data.name,
           email: data.email,
           password: data.password,
+          username: data.username,
         }),
       })
 
@@ -158,6 +160,34 @@ export function SignUpForm() {
           <p className="text-sm text-red-600 flex items-center mt-1">
             <XCircle className="w-4 h-4 mr-1" />
             {errors.name.message}
+          </p>
+        )}
+      </div>
+
+      {/* Username Field */}
+      <div className="space-y-2">
+        <Label htmlFor="username" className="text-gray-700 dark:text-gray-300">
+          Username
+        </Label>
+        <div className="relative">
+          <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Input
+            id="username"
+            type="text"
+            placeholder="Choose a unique username"
+            className={cn(
+              "h-12 pl-10 transition-all duration-200",
+              errors.username
+                ? "border-red-500 focus:border-red-500 focus:ring-red-500"
+                : "border-gray-300 focus:border-violet-500 focus:ring-violet-500",
+            )}
+            {...register("username")}
+          />
+        </div>
+        {errors.username && (
+          <p className="text-sm text-red-600 flex items-center mt-1">
+            <XCircle className="w-4 h-4 mr-1" />
+            {errors.username.message}
           </p>
         )}
       </div>

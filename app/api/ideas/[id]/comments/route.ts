@@ -82,10 +82,51 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
     }
 
+    // Verify user exists
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { id: true }
+    })
+
+    if (!user) {
+      return NextResponse.json(
+        { message: "User not found" },
+        { status: 404 }
+      )
+    }
+
+    // Verify idea exists
+    const idea = await prisma.idea.findUnique({
+      where: { id: ideaId },
+      select: { id: true }
+    })
+
+    if (!idea) {
+      return NextResponse.json(
+        { message: "Idea not found" },
+        { status: 404 }
+      )
+    }
+
     const { content, parentId } = await request.json()
 
     if (!content?.trim()) {
       return NextResponse.json({ message: "Content is required" }, { status: 400 })
+    }
+
+    // If parentId is provided, verify parent comment exists
+    if (parentId) {
+      const parentComment = await prisma.comment.findUnique({
+        where: { id: parentId },
+        select: { id: true }
+      })
+
+      if (!parentComment) {
+        return NextResponse.json(
+          { message: "Parent comment not found" },
+          { status: 404 }
+        )
+      }
     }
 
     const comment = await prisma.comment.create({

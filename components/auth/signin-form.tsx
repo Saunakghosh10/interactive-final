@@ -44,6 +44,7 @@ export function SignInForm() {
       const result = await signIn("credentials", {
         email: data.email,
         password: data.password,
+        callbackUrl: callbackUrl,
         redirect: false,
       })
 
@@ -68,18 +69,18 @@ export function SignInForm() {
           })
         }
       } else if (result?.ok) {
-        toast({
-          title: "Welcome back! 👋",
-          description: "You have been successfully signed in.",
-        })
-
         // Handle remember me functionality
         if (data.rememberMe) {
           localStorage.setItem("rememberMe", "true")
         }
 
-        router.push(callbackUrl)
-        router.refresh()
+        toast({
+          title: "Welcome back! 👋",
+          description: "You have been successfully signed in.",
+        })
+
+        // Use window.location for a full page reload to ensure session is properly set
+        window.location.href = callbackUrl
       }
     } catch (error) {
       console.error("Sign in error:", error)

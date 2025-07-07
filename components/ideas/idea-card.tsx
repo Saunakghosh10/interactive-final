@@ -120,11 +120,11 @@ export function IdeaCard({ idea, isOwnIdea = false, onEdit, onDelete, className 
       })
 
       if (response.ok) {
-        setIsBookmarked(!isBookmarked)
-        toast({
-          title: isBookmarked ? "Removed from bookmarks" : "Added to bookmarks",
-          description: isBookmarked ? "Idea removed from your bookmarks" : "Idea saved to your bookmarks",
-        })
+    setIsBookmarked(!isBookmarked)
+    toast({
+      title: isBookmarked ? "Removed from bookmarks" : "Added to bookmarks",
+      description: isBookmarked ? "Idea removed from your bookmarks" : "Idea saved to your bookmarks",
+    })
       } else {
         const data = await response.json()
         throw new Error(data.message)

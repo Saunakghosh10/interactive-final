@@ -45,9 +45,26 @@ export default function VerifyEmailPage() {
           title: "Email Verified! ✅",
           description: "Your account has been successfully verified.",
         })
-        setTimeout(() => {
+
+        // Sign in the user automatically
+        const signInResponse = await fetch("/api/auth/signin", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ 
+            email, 
+            callbackUrl: "/dashboard" 
+          }),
+        })
+
+        if (signInResponse.ok) {
+          // Redirect to dashboard after successful sign in
+          router.push("/dashboard")
+        } else {
+          // If auto sign-in fails, redirect to sign in page
           router.push("/auth/signin")
-        }, 3000)
+        }
       } else {
         setVerificationStatus("error")
         toast({

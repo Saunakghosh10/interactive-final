@@ -37,9 +37,10 @@ export function SignUpForm() {
 
   const passwordRequirements = [
     { label: "At least 8 characters", met: password?.length >= 8 },
-    { label: "One uppercase letter", met: /[A-Z]/.test(password || "") },
-    { label: "One lowercase letter", met: /[a-z]/.test(password || "") },
-    { label: "One number", met: /\d/.test(password || "") },
+    { label: "One uppercase letter (A-Z)", met: /[A-Z]/.test(password || "") },
+    { label: "One lowercase letter (a-z)", met: /[a-z]/.test(password || "") },
+    { label: "One number (0-9)", met: /\d/.test(password || "") },
+    { label: "Passwords match", met: password && confirmPassword && password === confirmPassword },
   ]
 
   const onSubmit = async (data: SignUpInput) => {
@@ -52,9 +53,26 @@ export function SignUpForm() {
       return
     }
 
+    // Check if all password requirements are met
+    const allRequirementsMet = passwordRequirements.every((req) => req.met)
+    if (!allRequirementsMet) {
+      toast({
+        title: "Invalid Password",
+        description: "Please ensure all password requirements are met",
+        variant: "destructive",
+      })
+      return
+    }
+
     setIsLoading(true)
 
     try {
+      console.log("Submitting registration form:", {
+        name: data.name,
+        email: data.email,
+        passwordLength: data.password?.length,
+      })
+
       const response = await fetch("/api/auth/register", {
         method: "POST",
         headers: {
@@ -68,6 +86,11 @@ export function SignUpForm() {
       })
 
       const result = await response.json()
+      console.log("Registration response:", {
+        status: response.status,
+        ok: response.ok,
+        message: result.message,
+      })
 
       if (response.ok) {
         toast({
@@ -76,13 +99,29 @@ export function SignUpForm() {
         })
         router.push(`/auth/verify-email?email=${encodeURIComponent(data.email)}`)
       } else {
-        toast({
-          title: "Registration Failed",
-          description: result.message || "Something went wrong. Please try again.",
-          variant: "destructive",
-        })
+        // Handle specific error cases
+        if (result.details) {
+          // If server returns detailed validation errors
+          const errorDetails = Object.entries(result.details)
+            .filter(([_, value]) => value !== null)
+            .map(([field, message]) => message)
+            .join("\n")
+
+          toast({
+            title: "Registration Failed",
+            description: errorDetails || result.message,
+            variant: "destructive",
+          })
+        } else {
+          toast({
+            title: "Registration Failed",
+            description: result.message || "Something went wrong. Please try again.",
+            variant: "destructive",
+          })
+        }
       }
     } catch (error) {
+      console.error("Registration error:", error)
       toast({
         title: "Network Error",
         description: "Please check your connection and try again.",

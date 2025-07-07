@@ -17,6 +17,12 @@ export async function POST(request: NextRequest) {
           gt: new Date(),
         },
       },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        emailVerified: true,
+      },
     })
 
     if (!user) {
@@ -24,18 +30,30 @@ export async function POST(request: NextRequest) {
     }
 
     // Update user as verified
-    await prisma.user.update({
+    const updatedUser = await prisma.user.update({
       where: { id: user.id },
       data: {
         emailVerified: new Date(),
         verificationToken: null,
         verificationExpires: null,
       },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        emailVerified: true,
+      },
     })
 
-    return NextResponse.json({ message: "Email verified successfully" }, { status: 200 })
+    return NextResponse.json({
+      message: "Email verified successfully",
+      user: updatedUser,
+    })
   } catch (error) {
     console.error("Email verification error:", error)
-    return NextResponse.json({ message: "Internal server error" }, { status: 500 })
+    return NextResponse.json(
+      { message: "Internal server error", error: process.env.NODE_ENV === "development" ? error : undefined },
+      { status: 500 },
+    )
   }
 }

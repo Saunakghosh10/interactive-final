@@ -27,10 +27,14 @@ export function SignInForm() {
   const {
     register,
     handleSubmit,
-    formState: { errors, isValid },
+    formState: { errors },
   } = useForm<SignInInput>({
     resolver: zodResolver(signInSchema),
-    mode: "onChange",
+    defaultValues: {
+      email: searchParams.get("email") || "",
+      password: "",
+      rememberMe: false,
+    },
   })
 
   const onSubmit = async (data: SignInInput) => {
@@ -50,10 +54,16 @@ export function SignInForm() {
             description: "Please check your email and password and try again.",
             variant: "destructive",
           })
+        } else if (result.error.includes("verify your email")) {
+          toast({
+            title: "Email Not Verified",
+            description: "Please check your email and verify your account before signing in.",
+            variant: "destructive",
+          })
         } else {
           toast({
             title: "Sign In Failed",
-            description: "Something went wrong. Please try again.",
+            description: result.error || "Something went wrong. Please try again.",
             variant: "destructive",
           })
         }
@@ -72,6 +82,7 @@ export function SignInForm() {
         router.refresh()
       }
     } catch (error) {
+      console.error("Sign in error:", error)
       toast({
         title: "Network Error",
         description: "Please check your connection and try again.",
@@ -167,7 +178,7 @@ export function SignInForm() {
       <Button
         type="submit"
         className="w-full h-12 bg-gradient-to-r from-violet-500 to-amber-500 hover:from-violet-600 hover:to-amber-600 text-white font-semibold transition-all duration-200 transform hover:scale-[1.02]"
-        disabled={isLoading || !isValid}
+        disabled={isLoading}
       >
         {isLoading ? <AuthLoading size="sm" /> : "Sign In"}
       </Button>

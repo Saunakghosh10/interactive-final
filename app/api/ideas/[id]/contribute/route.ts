@@ -43,7 +43,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     const existingRequest = await prisma.contributionRequest.findFirst({
       where: {
         ideaId: params.id,
-        userId: session.user.id,
+          userId: session.user.id,
         status: "PENDING",
       },
     })

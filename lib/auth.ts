@@ -34,30 +34,30 @@ export const authOptions: NextAuthOptions = {
         }
 
         try {
-          const user = await prisma.user.findUnique({
-            where: { email: credentials.email },
-          })
+        const user = await prisma.user.findUnique({
+          where: { email: credentials.email },
+        })
 
-          if (!user || !user.password) {
+        if (!user || !user.password) {
             throw new Error("User not found")
-          }
+        }
 
-          // Check if email is verified for manual registrations
-          if (!user.emailVerified && user.password) {
-            throw new Error("Please verify your email before signing in.")
-          }
+        // Check if email is verified for manual registrations
+        if (!user.emailVerified && user.password) {
+          throw new Error("Please verify your email before signing in.")
+        }
 
-          const isPasswordValid = await bcrypt.compare(credentials.password, user.password)
+        const isPasswordValid = await bcrypt.compare(credentials.password, user.password)
 
-          if (!isPasswordValid) {
+        if (!isPasswordValid) {
             throw new Error("Invalid password")
-          }
+        }
 
-          return {
-            id: user.id,
-            email: user.email,
-            name: user.name,
-            image: user.image,
+        return {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          image: user.image,
           }
         } catch (error) {
           console.error("Auth error:", error)

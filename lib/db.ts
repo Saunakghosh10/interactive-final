@@ -1,15 +1,23 @@
 import { PrismaClient } from "@prisma/client"
 
-const prismaClientSingleton = () => {
-  return new PrismaClient()
+declare global {
+  var prisma: PrismaClient | undefined
 }
 
-type PrismaClientSingleton = ReturnType<typeof prismaClientSingleton>
+export const prisma = global.prisma || new PrismaClient()
 
-const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClientSingleton | undefined
+if (process.env.NODE_ENV !== "production") {
+  global.prisma = prisma
 }
 
-export const prisma = globalForPrisma.prisma ?? prismaClientSingleton()
-
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma
+// Error handling middleware
+prisma.$use(async (params, next) => {
+  try {
+    const result = await next(params)
+    return result
+  } catch (error: any) {
+    console.error(`Prisma Error: ${error.message}`)
+    console.error(`Query Params:`, params)
+    throw error
+  }
+})

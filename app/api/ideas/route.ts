@@ -16,7 +16,10 @@ export async function GET(request: NextRequest) {
 
     const where: any = {
       status: "PUBLISHED",
-      visibility: "PUBLIC",
+      OR: [
+        { visibility: "PUBLIC" },
+        ...(session?.user?.id ? [{ authorId: session.user.id }] : []),
+      ],
     }
 
     if (search) {

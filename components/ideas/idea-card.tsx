@@ -13,6 +13,7 @@ import {
   MessageCircle,
   Share2,
   Eye,
+  EyeOff,
   Calendar,
   Building,
   Star,
@@ -35,6 +36,7 @@ interface IdeaCardProps {
     featured: boolean
     createdAt: Date
     status: "DRAFT" | "PUBLISHED" | "ARCHIVED"
+    visibility: "PUBLIC" | "PRIVATE"
     author: {
       id: string
       name?: string | null
@@ -210,6 +212,12 @@ export function IdeaCard({ idea, isOwnIdea = false, onEdit, onDelete, className 
             {idea.status === "DRAFT" && (
               <Badge variant="secondary" className="bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300">
                 Draft
+              </Badge>
+            )}
+            {idea.visibility === "PRIVATE" && (
+              <Badge variant="secondary" className="bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                <EyeOff className="w-3 h-3 mr-1" />
+                Private
               </Badge>
             )}
           </div>

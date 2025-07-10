@@ -5,12 +5,9 @@ import { prisma } from "@/lib/db"
 
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const ideaId = params.id
     const session = await getServerSession(authOptions)
-
-    // First fetch the idea without incrementing view count
     const idea = await prisma.idea.findUnique({
-      where: { id: ideaId },
+      where: { id: params.id },
       include: {
         author: {
           select: {
@@ -18,7 +15,6 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
             name: true,
             username: true,
             image: true,
-            bio: true,
           },
         },
         _count: {
@@ -51,17 +47,9 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       return NextResponse.json({ message: "Idea not found" }, { status: 404 })
     }
 
-    // Check if idea is private and user is not the owner
-    if (idea.visibility === "PRIVATE" && session?.user?.id !== idea.authorId) {
-      return NextResponse.json({ message: "Idea not found" }, { status: 404 })
-    }
-
-    // Only increment view count if the viewer is not the author
-    if (session?.user?.id !== idea.authorId) {
-      await prisma.idea.update({
-        where: { id: ideaId },
-        data: { viewCount: { increment: 1 } },
-      })
+    // Check if the user can access this idea
+    if (idea.visibility === "PRIVATE" && idea.authorId !== session?.user?.id) {
+      return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
     }
 
     return NextResponse.json(idea)
@@ -71,54 +59,122 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-export async function PUT(
-  req: Request,
-  { params }: { params: { id: string } }
-) {
+export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     const session = await getServerSession(authOptions)
+
     if (!session?.user?.id) {
-      return new NextResponse("Unauthorized", { status: 401 })
+      return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
     }
 
     const idea = await prisma.idea.findUnique({
       where: { id: params.id },
+      select: { authorId: true },
     })
 
     if (!idea) {
-      return new NextResponse("Idea not found", { status: 404 })
+      return NextResponse.json({ message: "Idea not found" }, { status: 404 })
     }
 
     if (idea.authorId !== session.user.id) {
-      return new NextResponse("Forbidden", { status: 403 })
+      return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
     }
 
-    const body = await req.json()
-
+    const data = await request.json()
     const updatedIdea = await prisma.idea.update({
       where: { id: params.id },
-      data: {
-        title: body.title,
-        description: body.description,
-        category: body.category,
-        tags: body.tags || [],
-        attachments: {
-          deleteMany: {},
-          create: body.media?.map((m: { url: string; type: string }) => ({
-            url: m.url,
-            type: m.type,
-          })) || [],
-        },
-        updatedAt: new Date(),
-      },
+      data,
       include: {
-        attachments: true,
+        author: {
+          select: {
+            id: true,
+            name: true,
+            username: true,
+            image: true,
+          },
+        },
       },
     })
 
     return NextResponse.json(updatedIdea)
   } catch (error) {
-    console.error("[IDEA_UPDATE_ERROR]", error)
-    return new NextResponse("Internal Server Error", { status: 500 })
+    console.error("Error updating idea:", error)
+    return NextResponse.json({ message: "Internal server error" }, { status: 500 })
+  }
+}
+
+export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+  try {
+    const session = await getServerSession(authOptions)
+
+    if (!session?.user?.id) {
+      return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+    }
+
+    const idea = await prisma.idea.findUnique({
+      where: { id: params.id },
+      select: { authorId: true },
+    })
+
+    if (!idea) {
+      return NextResponse.json({ message: "Idea not found" }, { status: 404 })
+    }
+
+    if (idea.authorId !== session.user.id) {
+      return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+    }
+
+    const data = await request.json()
+    const { visibility } = data
+
+    if (!visibility || !["PUBLIC", "PRIVATE"].includes(visibility)) {
+      return NextResponse.json({ message: "Invalid visibility value" }, { status: 400 })
+    }
+
+    const updatedIdea = await prisma.idea.update({
+      where: { id: params.id },
+      data: { visibility },
+      select: {
+        id: true,
+        visibility: true,
+      },
+    })
+
+    return NextResponse.json(updatedIdea)
+  } catch (error) {
+    console.error("Error updating idea visibility:", error)
+    return NextResponse.json({ message: "Internal server error" }, { status: 500 })
+  }
+}
+
+export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+  try {
+    const session = await getServerSession(authOptions)
+
+    if (!session?.user?.id) {
+      return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+    }
+
+    const idea = await prisma.idea.findUnique({
+      where: { id: params.id },
+      select: { authorId: true },
+    })
+
+    if (!idea) {
+      return NextResponse.json({ message: "Idea not found" }, { status: 404 })
+    }
+
+    if (idea.authorId !== session.user.id) {
+      return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+    }
+
+    await prisma.idea.delete({
+      where: { id: params.id },
+    })
+
+    return NextResponse.json({ message: "Idea deleted successfully" })
+  } catch (error) {
+    console.error("Error deleting idea:", error)
+    return NextResponse.json({ message: "Internal server error" }, { status: 500 })
   }
 }

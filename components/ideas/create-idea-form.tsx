@@ -38,6 +38,7 @@ const formSchema = z.object({
     "LIFESTYLE",
     "OTHER"
   ]),
+  visibility: z.enum(["PUBLIC", "PRIVATE"]),
   tags: z.array(z.string()).optional(),
   media: z.array(z.object({
     id: z.string().optional(),
@@ -72,6 +73,7 @@ export function CreateIdeaForm({ isEditing = false, initialData }: CreateIdeaFor
       title: "",
       description: "",
       category: "OTHER",
+      visibility: "PUBLIC",
       tags: [],
       media: [],
     },
@@ -173,6 +175,28 @@ export function CreateIdeaForm({ isEditing = false, initialData }: CreateIdeaFor
                   <SelectItem value="FINANCE">Finance</SelectItem>
                   <SelectItem value="LIFESTYLE">Lifestyle</SelectItem>
                   <SelectItem value="OTHER">Other</SelectItem>
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="visibility"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Visibility</FormLabel>
+              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select visibility" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="PUBLIC">Public - Visible to everyone</SelectItem>
+                  <SelectItem value="PRIVATE">Private - Only visible to you</SelectItem>
                 </SelectContent>
               </Select>
               <FormMessage />

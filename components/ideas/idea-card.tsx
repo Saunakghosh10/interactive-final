@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
-  Heart,
   MessageCircle,
   Share2,
   Eye,
@@ -19,11 +18,14 @@ import {
   Star,
   Edit,
   MoreHorizontal,
-  Bookmark,
 } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
+import { ContributionRequestButton } from "@/components/social/contribution-request-button"
+import { BookmarkButton } from "@/components/social/bookmark-button"
+import { ReportButton } from "@/components/social/report-button"
+import { SparkButton } from "@/components/social/spark-button"
 
 interface IdeaCardProps {
   idea: {
@@ -44,10 +46,16 @@ interface IdeaCardProps {
       image?: string | null
     }
     _count: {
-      likes: number
+      sparks: number
       comments: number
     }
-    ideaSkills?: { skill: { name: string } }[]
+    ideaSkills?: Array<{
+      skill: {
+        id: string
+        name: string
+        category?: string
+      }
+    }>
     ideaIndustries?: { industry: { name: string } }[]
   }
   isOwnIdea?: boolean
@@ -85,60 +93,8 @@ const categoryEmojis = {
 }
 
 export function IdeaCard({ idea, isOwnIdea = false, onEdit, onDelete, className }: IdeaCardProps) {
-  const [isLiked, setIsLiked] = useState(false)
   const [isBookmarked, setIsBookmarked] = useState(false)
-  const [likeCount, setLikeCount] = useState(idea._count.likes)
   const { toast } = useToast()
-
-  const handleLike = async (e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-
-    try {
-      const response = await fetch(`/api/ideas/${idea.id}/like`, {
-        method: isLiked ? "DELETE" : "POST",
-      })
-
-      if (response.ok) {
-        setIsLiked(!isLiked)
-        setLikeCount(isLiked ? likeCount - 1 : likeCount + 1)
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to update like status",
-        variant: "destructive",
-      })
-    }
-  }
-
-  const handleBookmark = async (e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-
-    try {
-      const response = await fetch(`/api/ideas/${idea.id}/bookmark`, {
-        method: isBookmarked ? "DELETE" : "POST",
-      })
-
-      if (response.ok) {
-    setIsBookmarked(!isBookmarked)
-    toast({
-      title: isBookmarked ? "Removed from bookmarks" : "Added to bookmarks",
-      description: isBookmarked ? "Idea removed from your bookmarks" : "Idea saved to your bookmarks",
-    })
-      } else {
-        const data = await response.json()
-        throw new Error(data.message)
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update bookmark status",
-        variant: "destructive",
-      })
-    }
-  }
 
   const handleShare = async (e: React.MouseEvent) => {
     e.preventDefault()
@@ -236,9 +192,14 @@ export function IdeaCard({ idea, isOwnIdea = false, onEdit, onDelete, className 
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={handleBookmark}>
-                  <Bookmark className="w-4 h-4 mr-2" />
-                  {isBookmarked ? "Remove bookmark" : "Bookmark"}
+                <DropdownMenuItem onClick={() => {
+                  const commentSection = document.getElementById("comments")
+                  if (commentSection) {
+                    commentSection.scrollIntoView({ behavior: "smooth" })
+                  }
+                }}>
+                  <MessageCircle className="w-4 h-4 mr-2" />
+                  {idea._count.comments}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={handleShare}>
                   <Share2 className="w-4 h-4 mr-2" />
@@ -332,43 +293,51 @@ export function IdeaCard({ idea, isOwnIdea = false, onEdit, onDelete, className 
             </div>
           )}
 
-          {/* Stats and Actions */}
-          <div className="flex items-center justify-between pt-2 border-t border-violet-100 dark:border-violet-800">
-            <div className="flex items-center space-x-4 text-sm text-gray-500 dark:text-gray-400">
-              <div className="flex items-center">
-                <Eye className="w-4 h-4 mr-1" />
-                {idea.viewCount}
-              </div>
-              <div className="flex items-center">
-                <MessageCircle className="w-4 h-4 mr-1" />
+          {/* Social Interactions */}
+          <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-800">
+            <div className="flex items-center space-x-4">
+              <SparkButton
+                targetId={idea.id}
+                targetType="idea"
+                initialCount={idea._count.sparks}
+                showCount
+                size="sm"
+              />
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-gray-500 hover:text-violet-500 hover:bg-violet-50 dark:text-gray-400 dark:hover:text-violet-400 dark:hover:bg-violet-950"
+                onClick={() => {
+                  const commentSection = document.getElementById("comments")
+                  if (commentSection) {
+                    commentSection.scrollIntoView({ behavior: "smooth" })
+                  }
+                }}
+              >
+                <MessageCircle className="w-4 h-4 mr-2" />
                 {idea._count.comments}
-              </div>
+              </Button>
             </div>
-
             <div className="flex items-center space-x-2">
-              <Button
-                size="sm"
-                variant="ghost"
-                className={cn(
-                  "h-8 px-2 transition-colors",
-                  isLiked
-                    ? "text-red-500 hover:text-red-600"
-                    : "text-gray-500 hover:text-red-500 dark:text-gray-400 dark:hover:text-red-400",
-                )}
-                onClick={handleLike}
-              >
-                <Heart className={cn("w-4 h-4 mr-1", isLiked && "fill-current")} />
-                {likeCount}
-              </Button>
-
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-8 px-2 text-gray-500 hover:text-violet-600 dark:text-gray-400 dark:hover:text-violet-400 transition-colors"
-                onClick={handleShare}
-              >
-                <Share2 className="w-4 h-4" />
-              </Button>
+              <ContributionRequestButton
+                ideaId={idea.id}
+                authorId={idea.author.id}
+                disabled={!idea.ideaSkills || idea.ideaSkills.length === 0}
+                requiredSkills={idea.ideaSkills?.map(({ skill }) => ({
+                  id: skill.id,
+                  name: skill.name,
+                  category: skill.category || "Other"
+                }))}
+              />
+              <BookmarkButton
+                ideaId={idea.id}
+                isBookmarked={isBookmarked}
+              />
+              <ReportButton
+                targetId={idea.id}
+                targetType="IDEA"
+                authorId={idea.author.id}
+              />
             </div>
           </div>
         </CardContent>

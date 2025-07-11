@@ -76,6 +76,10 @@ model User {
   reportedBy          Report[] @relation("ReportedBy")
   notifications       Notification[]
   bookmarks           Bookmark[]
+  ownedGroups         IdeaGroup[]  @relation("GroupOwner")
+  groupMemberships    GroupMember[]
+  groupMessages       GroupMessage[]
+  contributorPosts    ContributorPost[]
 }
 
 model Idea {
@@ -106,12 +110,8 @@ model Idea {
   activities          Activity[]
   reports             Report[]
   bookmarks           Bookmark[]
-
-  @@index([category])
-  @@index([status])
-  @@index([authorId])
-  @@index([createdAt])
-  @@index([sparkCount])
+  groups              IdeaGroup[]
+  contributorPosts    ContributorPost[]
 }
 
 model Spark {
@@ -121,11 +121,13 @@ model Spark {
   ideaId    String?
   projectId String?
   commentId String?
+  contributorPostId String?
 
   user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   idea    Idea?    @relation(fields: [ideaId], references: [id], onDelete: Cascade)
   project Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
   comment Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  contributorPost ContributorPost? @relation(fields: [contributorPostId], references: [id], onDelete: Cascade)
 
   @@unique([userId, ideaId])
   @@unique([userId, projectId])
@@ -145,6 +147,7 @@ model Comment {
   parentId  String?
   sparkCount Int     @default(0)
   isEdited  Boolean  @default(false)
+  contributorPostId String?
 
   author   User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
   project  Project?  @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -153,6 +156,7 @@ model Comment {
   replies  Comment[] @relation("CommentReplies")
   sparks   Spark[]
   reports  Report[]
+  contributorPost ContributorPost? @relation(fields: [contributorPostId], references: [id], onDelete: Cascade)
 
   @@index([authorId])
   @@index([ideaId])
@@ -167,6 +171,7 @@ model ContributionRequest {
   skills      String[]
   experience  String?                   @db.Text
   status      ContributionRequestStatus @default(PENDING)
+  initiatedByOwner Boolean              @default(false)
   createdAt   DateTime                  @default(now())
   updatedAt   DateTime                  @updatedAt
   respondedAt DateTime?
@@ -228,11 +233,13 @@ model Report {
   userId      String?
   ideaId      String?
   commentId   String?
+  contributorPostId String?
 
   reporter User     @relation("ReportedBy", fields: [reporterId], references: [id], onDelete: Cascade)
   user     User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   idea     Idea?    @relation(fields: [ideaId], references: [id], onDelete: Cascade)
   comment  Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  contributorPost ContributorPost? @relation(fields: [contributorPostId], references: [id], onDelete: Cascade)
 
   @@index([status])
   @@index([createdAt])
@@ -405,6 +412,80 @@ model Collaboration {
   @@unique([userId, projectId])
 }
 
+model IdeaGroup {
+  id          String   @id @default(cuid())
+  name        String
+  description String?  @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  ideaId      String
+  ownerId     String
+
+  idea         Idea          @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+  owner        User          @relation("GroupOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  members      GroupMember[]
+  messages     GroupMessage[]
+  posts        ContributorPost[]
+
+  @@index([ideaId])
+  @@index([ownerId])
+}
+
+model GroupMember {
+  id        String   @id @default(cuid())
+  role      GroupRole @default(MEMBER)
+  joinedAt  DateTime @default(now())
+  userId    String
+  groupId   String
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group     IdeaGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, groupId])
+  @@index([groupId])
+}
+
+model GroupMessage {
+  id        String   @id @default(cuid())
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  userId    String
+  groupId   String
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group     IdeaGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@index([groupId])
+  @@index([createdAt])
+}
+
+model ContributorPost {
+  id          String   @id @default(cuid())
+  title       String
+  content     String   @db.Text
+  status      ContributorPostStatus @default(DRAFT)
+  visibility  ContributorPostVisibility @default(GROUP)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  publishedAt DateTime?
+  userId      String
+  ideaId      String
+  groupId     String?
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  idea        Idea      @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+  group       IdeaGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  comments    Comment[]
+  sparks      Spark[]
+  reports     Report[]
+
+  @@index([userId])
+  @@index([ideaId])
+  @@index([groupId])
+  @@index([createdAt])
+}
+
 enum ProfileVisibility {
   PUBLIC
   PRIVATE
@@ -477,6 +558,8 @@ enum ActivityType {
   CONTRIBUTION_REQUESTED
   CONTRIBUTION_ACCEPTED
   CONTRIBUTION_WITHDRAWN
+  CONTRIBUTION_INVITED
+  CONTRIBUTION_INVITATION_CANCELLED
   PROJECT_CREATED
   PROJECT_UPDATED
 }
@@ -487,6 +570,7 @@ enum NotificationType {
   FOLLOW
   CONTRIBUTION_REQUEST
   CONTRIBUTION_ACCEPTED
+  CONTRIBUTION_INVITATION_CANCELLED
   MENTION
   SYSTEM
 }
@@ -505,4 +589,22 @@ enum ReportStatus {
   REVIEWED
   RESOLVED
   DISMISSED
+}
+
+enum GroupRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum ContributorPostStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum ContributorPostVisibility {
+  GROUP     // Visible only to group members
+  IDEA      // Visible to all idea contributors
+  PUBLIC    // Visible to everyone
 }

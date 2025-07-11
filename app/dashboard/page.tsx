@@ -11,18 +11,7 @@ import Link from "next/link"
 import { Loading } from "@/components/ui/loading"
 import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
-
-// Extend the Session type to include user.id
-declare module "next-auth" {
-  interface Session {
-    user?: {
-      id?: string
-      name?: string | null
-      email?: string | null
-      image?: string | null
-    }
-  }
-}
+import { ContributionDashboard } from "@/components/contributor/contribution-dashboard"
 
 interface DashboardStats {
   projectCount: number
@@ -204,6 +193,11 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
           ))}
+        </div>
+
+        {/* Contribution Invites */}
+        <div className="mb-8">
+          <ContributionDashboard />
         </div>
 
         {/* Latest Ideas and Recent Projects */}

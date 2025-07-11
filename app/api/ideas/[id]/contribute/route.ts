@@ -10,9 +10,17 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       return new NextResponse("Unauthorized", { status: 401 })
     }
 
-    const { message } = await req.json()
+    const { message, skills, experience } = await req.json()
     if (!message?.trim()) {
       return new NextResponse("Message is required", { status: 400 })
+    }
+
+    if (!skills?.length) {
+      return new NextResponse("At least one skill is required", { status: 400 })
+    }
+
+    if (!experience?.trim()) {
+      return new NextResponse("Experience description is required", { status: 400 })
     }
 
     // Check if idea exists and get author
@@ -43,7 +51,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     const existingRequest = await prisma.contributionRequest.findFirst({
       where: {
         ideaId: params.id,
-          userId: session.user.id,
+        userId: session.user.id,
         status: "PENDING",
       },
     })
@@ -58,6 +66,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         ideaId: params.id,
         userId: session.user.id,
         message: message.trim(),
+        skills: skills,
+        experience: experience.trim(),
         status: "PENDING",
       },
     })
@@ -72,6 +82,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         metadata: {
           requestId: contributionRequest.id,
           message: message.trim(),
+          skills: skills,
+          experience: experience.trim(),
           ideaTitle: idea.title,
           authorName: idea.author.name
         },

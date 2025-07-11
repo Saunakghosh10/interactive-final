@@ -10,13 +10,11 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Loading } from "@/components/ui/loading"
 import { VisibilityToggle } from "@/components/ideas/visibility-toggle"
 import {
-  Lightbulb,
   MessageCircle,
   Share2,
   Eye,
   Calendar,
   Edit,
-  Bookmark,
   Download,
   Building,
   Star,
@@ -28,6 +26,12 @@ import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 import { ContributionRequestButton } from "@/components/social/contribution-request-button"
 import { CommentSystem } from "@/components/social/comment-system"
+import { IdeaMessageBoard } from "@/components/ideas/idea-message-board"
+import { ContributionInvites } from "@/components/ideas/contribution-invites"
+import { ContributorPosts } from "@/components/ideas/contributor-posts"
+import { SparkButton } from "@/components/social/spark-button"
+import { BookmarkButton } from "@/components/social/bookmark-button"
+import { ReportButton } from "@/components/social/report-button"
 
 interface IdeaData {
   id: string
@@ -77,30 +81,61 @@ interface IdeaData {
     fileUrl: string
     fileType: string
   }>
+  contributionRequests: Array<{
+    id: string
+    userId: string
+    status: "PENDING" | "ACCEPTED" | "REJECTED"
+    createdAt: string
+  }>
+}
+
+interface Comment {
+  id: string
+  content: string
+  createdAt: string
+  updatedAt: string
+  isEdited: boolean
+  author: {
+    id: string
+    name?: string | null
+    username?: string | null
+    image?: string | null
+  }
+  replies?: Comment[]
+  _count: {
+    replies: number
+  }
 }
 
 export default function IdeaDetailPage() {
-  const params = useParams()
+  const { id } = useParams() as { id: string }
   const router = useRouter()
   const { data: session } = useSession()
+  const { toast } = useToast()
   const [idea, setIdea] = useState<IdeaData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [hasSparked, setHasSparked] = useState(false)
-  const [isBookmarked, setIsBookmarked] = useState(false)
   const [sparkCount, setSparkCount] = useState(0)
-  const { toast } = useToast()
+  const [isBookmarked, setIsBookmarked] = useState(false)
+  const [comments, setComments] = useState<Comment[]>([])
 
-  const isOwner = session?.user?.id === idea?.authorId
+  const isOwner = Boolean(session?.user?.id && idea?.authorId && session.user.id === idea.authorId)
+  const isContributor = Boolean(
+    session?.user?.id && 
+    idea?.contributionRequests && 
+    idea.contributionRequests.some(req => req.userId === session.user?.id && req.status === "ACCEPTED")
+  )
 
   useEffect(() => {
-    if (params.id) {
+    if (id) {
       fetchIdea()
+      fetchComments()
     }
-  }, [params.id])
+  }, [id])
 
   const fetchIdea = async () => {
     try {
-      const response = await fetch(`/api/ideas/${params.id}`)
+      const response = await fetch(`/api/ideas/${id}`)
       if (response.ok) {
         const ideaData = await response.json()
         setIdea(ideaData)
@@ -142,6 +177,22 @@ export default function IdeaDetailPage() {
       }
     } catch (error) {
       console.error("Error checking user interactions:", error)
+    }
+  }
+
+  const fetchComments = async () => {
+    try {
+      const response = await fetch(`/api/ideas/${id}/comments`)
+      if (!response.ok) throw new Error("Failed to fetch comments")
+      const data = await response.json()
+      setComments(data)
+    } catch (error) {
+      console.error("[FETCH_COMMENTS_ERROR]", error)
+      toast({
+        title: "Error",
+        description: "Failed to load comments",
+        variant: "destructive",
+      })
     }
   }
 
@@ -318,8 +369,87 @@ export default function IdeaDetailPage() {
                   </div>
                 </div>
               )}
+
+              {/* Social Interactions */}
+              <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-800">
+                <div className="flex items-center space-x-4">
+                  <SparkButton
+                    targetId={idea.id}
+                    targetType="idea"
+                    initialSparked={hasSparked}
+                    initialCount={sparkCount}
+                    showCount
+                  />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-gray-500 hover:text-violet-500 hover:bg-violet-50 dark:hover:bg-violet-950"
+                    onClick={() => {
+                      const commentSection = document.getElementById("comments")
+                      if (commentSection) {
+                        commentSection.scrollIntoView({ behavior: "smooth" })
+                      }
+                    }}
+                  >
+                    <MessageCircle className="w-4 h-4 mr-2" />
+                    {idea._count.comments}
+                  </Button>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <ContributionRequestButton
+                    ideaId={idea.id}
+                    authorId={idea.author.id}
+                    disabled={!idea.ideaSkills || idea.ideaSkills.length === 0}
+                    requiredSkills={idea.ideaSkills?.map(({ skill }) => ({
+                      id: skill.id,
+                      name: skill.name,
+                      category: skill.category || "Other"
+                    }))}
+                  />
+                  <BookmarkButton
+                    ideaId={idea.id}
+                    isBookmarked={isBookmarked}
+                  />
+                  <ReportButton
+                    targetId={idea.id}
+                    targetType="IDEA"
+                    authorId={idea.author.id}
+                  />
+                </div>
+              </div>
             </CardContent>
           </Card>
+
+          {/* Comments Section */}
+          <div id="comments" className="mt-8">
+            <CommentSystem
+              targetId={idea.id}
+              targetType="idea"
+              comments={comments}
+              onCommentsUpdate={setComments}
+            />
+          </div>
+
+          {(isContributor || isOwner) && (
+            <div className="mt-8">
+              <IdeaMessageBoard
+                ideaId={idea.id}
+                isContributor={isContributor}
+                isOwner={isOwner}
+              />
+            </div>
+          )}
+          {isOwner && (
+            <div className="mt-8">
+              <ContributionInvites ideaId={idea.id} />
+            </div>
+          )}
+          <div className="mt-8">
+            <ContributorPosts
+              ideaId={idea.id}
+              isContributor={isContributor}
+            />
+          </div>
         </div>
       </div>
     </div>

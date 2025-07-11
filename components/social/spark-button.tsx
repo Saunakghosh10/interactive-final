@@ -2,9 +2,9 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Heart, Zap } from "lucide-react"
+import { Lightbulb } from "lucide-react"
 import { useSession } from "next-auth/react"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
@@ -17,6 +17,7 @@ interface SparkButtonProps {
   size?: "sm" | "md" | "lg"
   showCount?: boolean
   className?: string
+  onSparkUpdate?: (newCount: number) => void
 }
 
 export function SparkButton({
@@ -27,6 +28,7 @@ export function SparkButton({
   size = "md",
   showCount = true,
   className,
+  onSparkUpdate,
 }: SparkButtonProps) {
   const { data: session } = useSession()
   const { toast } = useToast()
@@ -34,6 +36,25 @@ export function SparkButton({
   const [sparkCount, setSparkCount] = useState(initialCount)
   const [isAnimating, setIsAnimating] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+
+  useEffect(() => {
+    // Check initial spark status
+    const checkSparkStatus = async () => {
+      if (!session?.user?.id) return
+
+      try {
+        const response = await fetch(`/api/ideas/${targetId}/spark/check`)
+        if (response.ok) {
+          const { hasSparked } = await response.json()
+          setIsSparked(hasSparked)
+        }
+      } catch (error) {
+        console.error("Error checking spark status:", error)
+      }
+    }
+
+    checkSparkStatus()
+  }, [session?.user?.id, targetId])
 
   const handleSpark = async (e: React.MouseEvent) => {
     e.preventDefault()
@@ -54,19 +75,26 @@ export function SparkButton({
     setIsAnimating(true)
 
     try {
-      const response = await fetch(`/api/${targetType}s/${targetId}/spark`, {
+      const response = await fetch(`/api/ideas/${targetId}/spark`, {
         method: isSparked ? "DELETE" : "POST",
       })
 
       if (response.ok) {
         const newSparked = !isSparked
         setIsSparked(newSparked)
-        setSparkCount(newSparked ? sparkCount + 1 : sparkCount - 1)
+        const newCount = newSparked ? sparkCount + 1 : sparkCount - 1
+        setSparkCount(newCount)
+        onSparkUpdate?.(newCount)
 
         // Create spark animation effect
         if (newSparked) {
           createSparkEffect(e.currentTarget as HTMLElement)
         }
+
+        toast({
+          title: newSparked ? "Idea sparked! 💡" : "Spark removed",
+          description: newSparked ? "Thanks for supporting this idea!" : "You've removed your spark",
+        })
       } else {
         throw new Error("Failed to update spark")
       }
@@ -89,7 +117,7 @@ export function SparkButton({
     for (let i = 0; i < sparkles; i++) {
       const sparkle = document.createElement("div")
       sparkle.className = "fixed pointer-events-none z-50"
-      sparkle.innerHTML = "✨"
+      sparkle.innerHTML = "💡"
       sparkle.style.left = `${rect.left + rect.width / 2}px`
       sparkle.style.top = `${rect.top + rect.height / 2}px`
       sparkle.style.fontSize = "12px"
@@ -155,7 +183,7 @@ export function SparkButton({
       disabled={isLoading}
     >
       <div className="relative">
-        <Heart
+        <Lightbulb
           className={cn(
             iconSizes[size],
             "transition-all duration-200",
@@ -164,7 +192,7 @@ export function SparkButton({
           )}
         />
         {isAnimating && isSparked && (
-          <Zap className={cn(iconSizes[size], "absolute inset-0 text-yellow-400 animate-ping")} />
+          <Lightbulb className={cn(iconSizes[size], "absolute inset-0 text-yellow-400 animate-ping")} />
         )}
       </div>
       {showCount && (

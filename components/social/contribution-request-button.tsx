@@ -14,17 +14,29 @@ import {
 } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { HandshakeIcon, Loader2 } from "lucide-react"
+import { SkillTagInput } from "@/components/profile/skill-tag-input"
+import { Separator } from "@/components/ui/separator"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+
+interface Skill {
+  id: string
+  name: string
+  category: string
+}
 
 interface ContributionRequestButtonProps {
   ideaId: string
   authorId: string
   disabled?: boolean
+  requiredSkills?: Skill[]
 }
 
 export function ContributionRequestButton({
   ideaId,
   authorId,
   disabled = false,
+  requiredSkills = [],
 }: ContributionRequestButtonProps) {
   const { data: session, status: sessionStatus } = useSession()
   const { toast } = useToast()
@@ -32,6 +44,8 @@ export function ContributionRequestButton({
   const [hasRequested, setHasRequested] = useState(false)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [message, setMessage] = useState("")
+  const [selectedSkills, setSelectedSkills] = useState<Skill[]>([])
+  const [experience, setExperience] = useState("")
   const [isCheckingStatus, setIsCheckingStatus] = useState(true)
 
   useEffect(() => {
@@ -48,7 +62,7 @@ export function ContributionRequestButton({
       if (response.ok) {
         const { hasRequested: existingRequest } = await response.json()
         setHasRequested(existingRequest)
-    }
+      }
     } catch (error) {
       console.error("Error checking contribution request:", error)
       toast({
@@ -89,6 +103,24 @@ export function ContributionRequestButton({
       return
     }
 
+    if (selectedSkills.length === 0) {
+      toast({
+        title: "Skills required",
+        description: "Please select at least one skill you can contribute",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (!experience) {
+      toast({
+        title: "Experience required",
+        description: "Please describe your relevant experience",
+        variant: "destructive",
+      })
+      return
+    }
+
     setIsLoading(true)
 
     try {
@@ -97,7 +129,11 @@ export function ContributionRequestButton({
         headers: {
           "Content-Type": "application/json",
         },
-        body: hasRequested ? undefined : JSON.stringify({ message }),
+        body: hasRequested ? undefined : JSON.stringify({ 
+          message,
+          skills: selectedSkills.map(s => s.name),
+          experience 
+        }),
       })
 
       if (!response.ok) {
@@ -107,7 +143,9 @@ export function ContributionRequestButton({
 
       setHasRequested(!hasRequested)
       setIsDialogOpen(false)
-        setMessage("")
+      setMessage("")
+      setSelectedSkills([])
+      setExperience("")
 
       toast({
         title: hasRequested ? "Request withdrawn" : "Request sent!",
@@ -141,7 +179,7 @@ export function ContributionRequestButton({
 
   return (
     <>
-        <Button
+      <Button
         variant={hasRequested ? "outline" : "default"}
         onClick={() => {
           if (!session) {
@@ -163,38 +201,79 @@ export function ContributionRequestButton({
           <HandshakeIcon className="h-4 w-4" />
         )}
         {hasRequested ? "Cancel Request" : "Request to Contribute"}
-        </Button>
+      </Button>
 
       <Dialog open={isDialogOpen} onOpenChange={(open) => {
         if (!open) {
           setMessage("")
+          setSelectedSkills([])
+          setExperience("")
         }
         setIsDialogOpen(open)
       }}>
-        <DialogContent>
-        <DialogHeader>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
             <DialogTitle>Request to Contribute</DialogTitle>
             <DialogDescription>
               Send a message to the author explaining how you'd like to contribute to this idea.
             </DialogDescription>
-        </DialogHeader>
+          </DialogHeader>
 
-          <div className="py-4">
-            <Textarea
-              placeholder="Share your thoughts, skills, and how you can help bring this idea to life..."
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              rows={4}
-              disabled={isLoading}
-            />
+          <div className="space-y-6">
+            {/* Message */}
+            <div className="space-y-2">
+              <Label htmlFor="message">Message</Label>
+              <Textarea
+                id="message"
+                placeholder="Share your thoughts, skills, and how you can help bring this idea to life..."
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                rows={4}
+                disabled={isLoading}
+              />
+            </div>
+
+            <Separator />
+
+            {/* Skills */}
+            <div className="space-y-2">
+              <Label>Skills you can contribute</Label>
+              <SkillTagInput
+                selectedSkills={selectedSkills}
+                onSkillsChange={setSelectedSkills}
+                placeholder="Select your relevant skills..."
+              />
+              {requiredSkills.length > 0 && (
+                <div className="mt-2 text-sm text-gray-500">
+                  Required skills: {requiredSkills.map(s => s.name).join(", ")}
+                </div>
+              )}
+            </div>
+
+            <Separator />
+
+            {/* Experience */}
+            <div className="space-y-2">
+              <Label htmlFor="experience">Relevant Experience</Label>
+              <Textarea
+                id="experience"
+                placeholder="Describe your relevant experience with these skills..."
+                value={experience}
+                onChange={(e) => setExperience(e.target.value)}
+                rows={3}
+                disabled={isLoading}
+              />
+            </div>
           </div>
 
           <DialogFooter>
-              <Button
-                variant="outline"
+            <Button
+              variant="outline"
               onClick={() => {
                 setIsDialogOpen(false)
                 setMessage("")
+                setSelectedSkills([])
+                setExperience("")
               }}
               disabled={isLoading}
             >
@@ -202,13 +281,13 @@ export function ContributionRequestButton({
             </Button>
             <Button
               onClick={handleContributionRequest}
-              disabled={isLoading || !message.trim()}
+              disabled={isLoading || !message.trim() || selectedSkills.length === 0 || !experience.trim()}
             >
               {isLoading ? "Sending..." : "Send Request"}
             </Button>
           </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }

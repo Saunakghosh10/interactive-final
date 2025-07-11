@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useSession } from "next-auth/react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
@@ -49,7 +48,6 @@ interface GroupedRequests {
 }
 
 export function ContributorDashboard() {
-  const { data: session } = useSession()
   const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(true)
   const [requests, setRequests] = useState<GroupedRequests>({
@@ -62,10 +60,8 @@ export function ContributorDashboard() {
 
   useEffect(() => {
     const fetchContributions = async () => {
-      if (!session?.user?.id) return
-
       try {
-        const response = await fetch(`/api/users/${session.user.id}/contributions`)
+        const response = await fetch(`/api/users/me/contributions`)
         if (response.ok) {
           const data = await response.json()
           setRequests(data)
@@ -85,7 +81,7 @@ export function ContributorDashboard() {
     }
 
     fetchContributions()
-  }, [session])
+  }, [])
 
   const getStatusIcon = (status: string) => {
     switch (status) {

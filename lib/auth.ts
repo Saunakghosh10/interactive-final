@@ -29,14 +29,14 @@ async function generateUniqueUsername(baseUsername: string): Promise<string> {
 }
 
 // Extend the Session type to include our custom properties
-interface ExtendedSession extends Session {
+interface ExtendedSession extends Omit<Session, "user"> {
   user: {
     id: string
-    name?: string | null
-    email?: string | null
-    image?: string | null
-    username?: string
-    emailVerified?: Date | null
+    name: string | null
+    email: string
+    image: string | null
+    username: string | null
+    emailVerified: Date | null
   }
 }
 
@@ -45,6 +45,8 @@ export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET,
   session: {
     strategy: "jwt",
+    maxAge: 30 * 24 * 60 * 60, // 30 days
+    updateAge: 24 * 60 * 60, // 24 hours
   },
   pages: {
     signIn: "/auth/signin",
@@ -111,7 +113,7 @@ export const authOptions: NextAuthOptions = {
           console.error("Auth error:", error)
           throw error
         }
-      },
+      }
     }),
   ],
   callbacks: {
@@ -151,7 +153,11 @@ export const authOptions: NextAuthOptions = {
           }
 
           // If user exists but doesn't have a Google account linked
-          if (!existingUser.accounts.some((acc: Account) => acc.provider === "google")) {
+          const hasGoogleAccount = existingUser.accounts.some(
+            (acc) => acc.provider === "google"
+          )
+          
+          if (!hasGoogleAccount) {
             await prisma.account.create({
               data: {
                 userId: existingUser.id,
@@ -179,24 +185,28 @@ export const authOptions: NextAuthOptions = {
       if (extendedSession?.user && token?.sub) {
         extendedSession.user.id = token.sub
         
-        // Get user data from database to ensure we have the most up-to-date information
-        const dbUser = await prisma.user.findUnique({
-          where: { id: token.sub },
-          select: { 
-            username: true, 
-            emailVerified: true,
-            name: true,
-            email: true,
-            image: true,
-          },
-        })
+        try {
+          // Get user data from database to ensure we have the most up-to-date information
+          const dbUser = await prisma.user.findUnique({
+            where: { id: token.sub },
+            select: { 
+              username: true, 
+              emailVerified: true,
+              name: true,
+              email: true,
+              image: true,
+            },
+          })
 
-        if (dbUser) {
-          extendedSession.user.username = dbUser.username
-          extendedSession.user.emailVerified = dbUser.emailVerified
-          extendedSession.user.name = dbUser.name
-          extendedSession.user.email = dbUser.email
-          extendedSession.user.image = dbUser.image
+          if (dbUser) {
+            extendedSession.user.username = dbUser.username
+            extendedSession.user.emailVerified = dbUser.emailVerified
+            extendedSession.user.name = dbUser.name
+            extendedSession.user.email = dbUser.email
+            extendedSession.user.image = dbUser.image
+          }
+        } catch (error) {
+          console.error("Error fetching user data in session callback:", error)
         }
       }
       return extendedSession
@@ -208,23 +218,32 @@ export const authOptions: NextAuthOptions = {
       return token
     },
     redirect({ url, baseUrl }) {
-      // Always redirect to dashboard after OAuth sign-in
-      if (url.includes("signin") || url.includes("callback")) {
-        return `${baseUrl}/dashboard`
-      }
-      
-      // Allow relative callback URLs
+      // Handle relative and absolute URLs
       if (url.startsWith("/")) {
         return `${baseUrl}${url}`
-      }
-      
-      // Allow callback URLs on the same origin
-      if (new URL(url).origin === baseUrl) {
+      } else if (new URL(url).origin === baseUrl) {
         return url
       }
-      
-      return `${baseUrl}/dashboard`
+      return baseUrl
+    },
+  },
+  events: {
+    async signIn({ user }) {
+      // Update user's last activity
+      if (user.id) {
+        try {
+          await prisma.user.update({
+            where: { id: user.id },
+            data: { 
+              updatedAt: new Date(),
+            },
+          })
+        } catch (error) {
+          console.error("Error updating user activity:", error)
+        }
+      }
     },
   },
   debug: process.env.NODE_ENV === "development",
 }
+

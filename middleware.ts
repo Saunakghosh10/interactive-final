@@ -3,6 +3,14 @@ import { NextResponse } from "next/server"
 
 export default withAuth(
   function middleware(req) {
+    // Get the pathname
+    const path = req.nextUrl.pathname
+
+    // Allow public access to view-only idea pages
+    if (path.startsWith('/ideas/') && !path.includes('/edit') && !path.includes('/create')) {
+      return NextResponse.next()
+    }
+
     // If the user is authenticated, allow access to protected routes
     if (req.nextauth.token) {
       return NextResponse.next()
@@ -15,18 +23,28 @@ export default withAuth(
   },
   {
     callbacks: {
-      authorized: ({ token }) => !!token,
+      authorized: ({ token, req }) => {
+        // Allow public access to view-only idea pages
+        if (req.nextUrl.pathname.startsWith('/ideas/') && 
+            !req.nextUrl.pathname.includes('/edit') && 
+            !req.nextUrl.pathname.includes('/create')) {
+          return true
+        }
+        return !!token
+      },
     },
   },
 )
 
+// Update matcher to be more specific
 export const config = {
   matcher: [
-    "/dashboard/:path*",
-    "/profile/:path*",
-    "/settings/:path*",
-    "/create/:path*",
-    "/projects/:path*",
-    "/ideas/:path*",
-  ],
+    '/dashboard/:path*',
+    '/profile/:path*',
+    '/settings/:path*',
+    '/ideas/create/:path*',
+    '/ideas/edit/:path*',
+    '/ideas/:path*/edit',
+    '/projects/:path*',
+  ]
 }

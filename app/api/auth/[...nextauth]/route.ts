@@ -1,8 +1,9 @@
 import NextAuth from "next-auth"
 import { authOptions } from "@/lib/auth"
 
-export const runtime = 'nodejs'
-export const dynamic = 'force-dynamic'
+// Force dynamic runtime for NextAuth in production
+export const dynamic = "force-dynamic"
+export const runtime = "nodejs"
 
 const handler = NextAuth(authOptions)
 

@@ -110,7 +110,7 @@ interface Comment {
 export default function IdeaDetailPage() {
   const { id } = useParams() as { id: string }
   const router = useRouter()
-  const { data: session } = useSession()
+  const { data: session, status } = useSession()
   const { toast } = useToast()
   const [idea, setIdea] = useState<IdeaData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -126,13 +126,6 @@ export default function IdeaDetailPage() {
     idea.contributionRequests.some(req => req.userId === session.user?.id && req.status === "ACCEPTED")
   )
 
-  useEffect(() => {
-    if (id) {
-      fetchIdea()
-      fetchComments()
-    }
-  }, [id])
-
   const fetchIdea = async () => {
     try {
       const response = await fetch(`/api/ideas/${id}`)
@@ -140,10 +133,6 @@ export default function IdeaDetailPage() {
         const ideaData = await response.json()
         setIdea(ideaData)
         setSparkCount(ideaData._count.sparks)
-        // Check if user has sparked/bookmarked this idea
-        if (session?.user?.id) {
-          checkUserInteractions(ideaData.id)
-        }
       } else {
         router.push("/ideas")
       }
@@ -160,6 +149,8 @@ export default function IdeaDetailPage() {
   }
 
   const checkUserInteractions = async (ideaId: string) => {
+    if (!session?.user?.id) return
+    
     try {
       const [sparkResponse, bookmarkResponse] = await Promise.all([
         fetch(`/api/ideas/${ideaId}/spark/check`),
@@ -196,6 +187,19 @@ export default function IdeaDetailPage() {
     }
   }
 
+  useEffect(() => {
+    if (id) {
+      fetchIdea()
+      fetchComments()
+    }
+  }, [id])
+
+  useEffect(() => {
+    if (id && session?.user?.id && idea?.id) {
+      checkUserInteractions(idea.id)
+    }
+  }, [id, session?.user?.id, idea?.id])
+
   const formatDate = (date: string) => {
     return new Intl.DateTimeFormat("en-US", {
       month: "long",
@@ -204,7 +208,8 @@ export default function IdeaDetailPage() {
     }).format(new Date(date))
   }
 
-  if (isLoading) {
+  // Render loading states
+  if (status === "loading" || isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
         <div className="container max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -216,6 +221,7 @@ export default function IdeaDetailPage() {
     )
   }
 
+  // Render not found state
   if (!idea) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">

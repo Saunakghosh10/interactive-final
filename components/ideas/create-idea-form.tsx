@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { useSession } from "next-auth/react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
@@ -52,6 +53,8 @@ const formSchema = z.object({
 type FormData = z.infer<typeof formSchema>
 
 interface CreateIdeaFormProps {
+  onSubmit: (data: FormData) => Promise<void>
+  onSaveDraft: (data: FormData) => Promise<void>
   isEditing?: boolean
   initialData?: {
     id: string
@@ -63,8 +66,9 @@ interface CreateIdeaFormProps {
   }
 }
 
-export function CreateIdeaForm({ isEditing = false, initialData }: CreateIdeaFormProps) {
+export function CreateIdeaForm({ onSubmit, onSaveDraft, isEditing = false, initialData }: CreateIdeaFormProps) {
   const router = useRouter()
+  const { data: session, status } = useSession()
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const form = useForm<FormData>({
@@ -79,33 +83,22 @@ export function CreateIdeaForm({ isEditing = false, initialData }: CreateIdeaFor
     },
   })
 
-  async function onSubmit(values: FormData) {
+  // Don't render the form if we don't have a session
+  if (status === "loading") {
+    return <div>Loading...</div>
+  }
+
+  if (!session?.user) {
+    router.push("/auth/signin?callbackUrl=/ideas/create")
+    return null
+  }
+
+  const handleFormSubmit = async (values: FormData) => {
     try {
       setIsSubmitting(true)
-      const endpoint = isEditing ? `/api/ideas/${initialData?.id}` : "/api/ideas"
-      const method = isEditing ? "PUT" : "POST"
-
-      const response = await fetch(endpoint, {
-        method: method,
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(values),
-      })
-
-      if (!response.ok) {
-        throw new Error("Failed to submit idea")
-      }
-
-      const data = await response.json()
-      toast({
-        title: isEditing ? "Idea Updated" : "Idea Created",
-        description: isEditing ? "Your idea has been updated successfully." : "Your idea has been created successfully.",
-      })
-      router.push(`/ideas/${data.id}`)
-      router.refresh()
+      await onSubmit(values)
     } catch (error) {
-      console.error(error)
+      console.error("Form submission error:", error)
       toast({
         title: "Error",
         description: "Something went wrong. Please try again.",
@@ -116,9 +109,23 @@ export function CreateIdeaForm({ isEditing = false, initialData }: CreateIdeaFor
     }
   }
 
+  const handleDraftSave = async () => {
+    try {
+      const values = form.getValues()
+      await onSaveDraft(values)
+    } catch (error) {
+      console.error("Draft save error:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save draft. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+      <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-8">
         <FormField
           control={form.control}
           name="title"
@@ -140,7 +147,7 @@ export function CreateIdeaForm({ isEditing = false, initialData }: CreateIdeaFor
             <FormItem>
               <FormLabel>Description</FormLabel>
               <FormControl>
-              <Textarea
+                <Textarea
                   placeholder="Describe your idea in detail"
                   className="min-h-[200px]"
                   {...field}
@@ -221,15 +228,20 @@ export function CreateIdeaForm({ isEditing = false, initialData }: CreateIdeaFor
           )}
         />
 
-        <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting ? (
-            "Submitting..."
-          ) : isEditing ? (
-            "Update Idea"
-                  ) : (
-            "Create Idea"
-                  )}
-                </Button>
+        <div className="flex gap-4">
+          <Button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? (
+              "Submitting..."
+            ) : isEditing ? (
+              "Update Idea"
+            ) : (
+              "Create Idea"
+            )}
+          </Button>
+          <Button type="button" variant="outline" onClick={handleDraftSave} disabled={isSubmitting}>
+            Save as Draft
+          </Button>
+        </div>
       </form>
     </Form>
   )
